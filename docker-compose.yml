@@ -1,0 +1,31 @@
+services:
+  bookshelf-db:
+    image: postgres:16-alpine
+    container_name: bookshelf-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bookshelf
+      POSTGRES_PASSWORD: bookshelf
+      POSTGRES_DB: bookshelf
+    volumes:
+      - bookshelf-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bookshelf -d bookshelf"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  bookshelf:
+    build: .
+    container_name: bookshelf
+    restart: unless-stopped
+    depends_on:
+      bookshelf-db:
+        condition: service_healthy
+    ports:
+      - "3003:3000"
+    environment:
+      DATABASE_URL: postgresql://bookshelf:bookshelf@bookshelf-db:5432/bookshelf?schema=public
+
+volumes:
+  bookshelf-postgres:
