@@ -516,10 +516,173 @@ function Cabinet({
   );
 }
 
+// ─── Currently Reading featured card ─────────────────────────────────────────
+
+function CurrentlyReadingCard({ shelf }: { shelf: ShelfData }) {
+  const { accentColor, entries } = shelf;
+  const book = entries[0] ?? null;
+
+  if (!book) {
+    return (
+      <div
+        style={{
+          background: 'linear-gradient(175deg, #2e1f0a 0%, #1c1208 50%, #140d06 100%)',
+          border: '2px solid #6b4c28',
+          borderRadius: '10px',
+          boxShadow: 'inset 0 1px 0 rgba(180,130,60,0.15), 0 4px 24px rgba(0,0,0,0.5)',
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+        }}
+      >
+        <div
+          style={{
+            width: '52px',
+            height: '76px',
+            borderRadius: '3px',
+            background: 'rgba(180,140,80,0.06)',
+            border: '1px solid rgba(180,140,80,0.10)',
+            flexShrink: 0,
+          }}
+        />
+        <p style={{ fontSize: '0.75rem', color: `${accentColor}66`, fontStyle: 'italic', margin: 0 }}>
+          {shelf.emptyMessage}
+        </p>
+      </div>
+    );
+  }
+
+  const label = progressLabel(book.currentPage, book.pageCount, book.currentPercent);
+  const pct = progressPercent(book.currentPage, book.pageCount, book.currentPercent);
+
+  return (
+    <div
+      style={{
+        background: 'linear-gradient(175deg, #2e1f0a 0%, #1c1208 50%, #140d06 100%)',
+        border: `2px solid ${accentColor}55`,
+        borderRadius: '10px',
+        boxShadow: `inset 0 1px 0 rgba(180,130,60,0.15), 0 0 20px ${accentColor}18, 0 4px 24px rgba(0,0,0,0.5)`,
+        padding: '16px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+      }}
+    >
+      {/* Cover */}
+      <div
+        style={{
+          width: '52px',
+          height: '76px',
+          borderRadius: '3px',
+          overflow: 'hidden',
+          flexShrink: 0,
+          background: spineColor(book.bookId),
+          border: `1px solid ${accentColor}44`,
+        }}
+      >
+        {book.coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            alt=""
+            src={book.coverUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
+          />
+        ) : book.spineImageData ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            alt=""
+            src={book.spineImageData}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : null}
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontFamily: 'var(--font-serif), Georgia, serif',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: 'var(--foreground)',
+            margin: 0,
+            lineHeight: 1.3,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {book.title}
+        </p>
+        {book.author && (
+          <p style={{ fontSize: '0.72rem', color: 'var(--muted)', margin: '2px 0 8px' }}>
+            {book.author}
+          </p>
+        )}
+
+        {label && (
+          <p style={{ fontSize: '0.68rem', color: 'var(--muted)', margin: '0 0 4px' }}>
+            {label}
+          </p>
+        )}
+        {pct !== null && (
+          <div
+            style={{
+              height: '3px',
+              background: 'rgba(255,255,255,0.08)',
+              borderRadius: '2px',
+              overflow: 'hidden',
+              marginBottom: '10px',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${pct}%`,
+                background: accentColor,
+                borderRadius: '2px',
+              }}
+            />
+          </div>
+        )}
+
+        <Link
+          href={`/books/${book.bookId}`}
+          style={{
+            display: 'inline-block',
+            fontSize: '0.68rem',
+            fontWeight: 600,
+            color: accentColor,
+            border: `1px solid ${accentColor}66`,
+            borderRadius: '4px',
+            padding: '3px 8px',
+            letterSpacing: '0.04em',
+            transition: 'background 0.15s ease, border-color 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.background = `${accentColor}22`;
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = accentColor;
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
+            (e.currentTarget as HTMLAnchorElement).style.borderColor = `${accentColor}66`;
+          }}
+        >
+          View details &rarr;
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 // ─── Root component ───────────────────────────────────────────────────────────
 
 export default function BookShelfView({ shelves, totalBooks }: Props) {
   const [selected, setSelected] = useState<Partial<Record<string, number>>>({});
+
+  const readingShelf = shelves.find((s) => s.status === 'READING');
+  const otherShelves = shelves.filter((s) => s.status !== 'READING');
 
   return (
     <div>
@@ -561,6 +724,26 @@ export default function BookShelfView({ shelves, totalBooks }: Props) {
         </p>
       </section>
 
+      {/* Currently Reading */}
+      {readingShelf && (
+        <div style={{ marginBottom: '28px' }}>
+          <p
+            style={{
+              fontFamily: 'var(--font-serif), Georgia, serif',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: readingShelf.accentColor,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              margin: '0 0 8px',
+            }}
+          >
+            Currently Reading
+          </p>
+          <CurrentlyReadingCard shelf={readingShelf} />
+        </div>
+      )}
+
       {/* Cabinets grid */}
       <div
         style={{
@@ -569,7 +752,7 @@ export default function BookShelfView({ shelves, totalBooks }: Props) {
           gap: '20px',
         }}
       >
-        {shelves.map((shelf) => (
+        {otherShelves.map((shelf) => (
           <Cabinet
             key={shelf.status}
             shelf={shelf}
