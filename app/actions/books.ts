@@ -36,6 +36,43 @@ function parseStatus(value: FormDataEntryValue | null): ShelfStatus {
   return "WANT_TO_READ";
 }
 
+function deriveShelfDates({
+  status,
+  previousStartedAt,
+  previousFinishedAt,
+  now,
+}: {
+  status: ShelfStatus;
+  previousStartedAt: Date | null;
+  previousFinishedAt: Date | null;
+  now: Date;
+}): { startedAt: Date | null; finishedAt: Date | null } {
+  const dates = deriveStatusDates({
+    nextStatus: status,
+    previousStartedAt,
+    previousFinishedAt,
+    now,
+  });
+
+  if (status !== "FINISHED") {
+    return { ...dates, finishedAt: null };
+  }
+
+  return dates;
+}
+
+function getOptionalDateField(
+  formData: FormData,
+  name: string,
+  fallback: Date | null,
+): Date | null {
+  if (!formData.has(name)) {
+    return fallback;
+  }
+
+  return parseOptionalDate(formData.get(name));
+}
+
 export async function addBook(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const externalId = String(formData.get("externalId") ?? "").trim();
@@ -49,28 +86,41 @@ export async function addBook(formData: FormData) {
   const pageCount = parseOptionalInt(formData.get("pageCount"));
   const status = parseStatus(formData.get("status"));
   const now = new Date();
-  const dates = deriveStatusDates({
-    nextStatus: status,
-    previousStartedAt: null,
-    previousFinishedAt: null,
-    now,
-  });
 
-  const book = await prisma.book.upsert({
-    where: { externalId },
-    update: { title, author, coverUrl, pageCount },
-    create: { title, author, coverUrl, pageCount, externalId },
-  });
+  const book = await prisma.$transaction(async (tx) => {
+    const book = await tx.book.upsert({
+      where: { externalId },
+      update: { title, author, coverUrl, pageCount },
+      create: { title, author, coverUrl, pageCount, externalId },
+    });
 
-  await prisma.shelfEntry.upsert({
-    where: { bookId: book.id },
-    update: { status },
-    create: {
-      bookId: book.id,
+    const existingEntry = await tx.shelfEntry.findUnique({
+      where: { bookId: book.id },
+      select: { startedAt: true, finishedAt: true },
+    });
+    const dates = deriveShelfDates({
       status,
-      startedAt: dates.startedAt,
-      finishedAt: dates.finishedAt,
-    },
+      previousStartedAt: existingEntry?.startedAt ?? null,
+      previousFinishedAt: existingEntry?.finishedAt ?? null,
+      now,
+    });
+
+    await tx.shelfEntry.upsert({
+      where: { bookId: book.id },
+      update: {
+        status,
+        startedAt: dates.startedAt,
+        finishedAt: dates.finishedAt,
+      },
+      create: {
+        bookId: book.id,
+        status,
+        startedAt: dates.startedAt,
+        finishedAt: dates.finishedAt,
+      },
+    });
+
+    return book;
   });
 
   revalidatePath("/");
@@ -87,12 +137,18 @@ export async function updateShelfEntry(bookId: number, formData: FormData) {
     parseOptionalInt(formData.get("currentPage")) ?? 0,
     entry.book.pageCount,
   );
-  const dates = deriveStatusDates({
-    nextStatus: status,
-    previousStartedAt:
-      parseOptionalDate(formData.get("startedAt")) ?? entry.startedAt,
-    previousFinishedAt:
-      parseOptionalDate(formData.get("finishedAt")) ?? entry.finishedAt,
+  const dates = deriveShelfDates({
+    status,
+    previousStartedAt: getOptionalDateField(
+      formData,
+      "startedAt",
+      entry.startedAt,
+    ),
+    previousFinishedAt: getOptionalDateField(
+      formData,
+      "finishedAt",
+      entry.finishedAt,
+    ),
     now: new Date(),
   });
   const rating = parseOptionalInt(formData.get("rating"));
