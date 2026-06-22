@@ -43,9 +43,11 @@ model ShelfEntry {
 }
 
 model ProgressLog {
-  id           Int        @id @default(autoincrement())
-  shelfEntryId Int
-  currentPage  Int
-  createdAt    DateTime   @default(now())
-  shelfEntry   ShelfEntry @relation(fields: [shelfEntryId], references: [id], onDelete: Cascade)
+  id             Int        @id @default(autoincrement())
+  shelfEntryId   Int
+  currentPage    Int
+  currentPercent Float?
+  notes          String?
+  createdAt      DateTime   @default(now())
+  shelfEntry     ShelfEntry @relation(fields: [shelfEntryId], references: [id], onDelete: Cascade)
 }

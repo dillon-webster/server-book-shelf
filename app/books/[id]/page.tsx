@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { addTenPages, updateShelfEntry } from "@/app/actions/books";
+import { addTenPages, deleteBook, deleteProgressLog, updateShelfEntry } from "@/app/actions/books";
 import { prisma } from "@/lib/prisma";
 import { shelfLabels, shelfOrder } from "@/lib/shelves";
 
@@ -26,7 +26,7 @@ export default async function BookPage({
     where: { bookId },
     include: {
       book: true,
-      progressLogs: { orderBy: { createdAt: "desc" }, take: 5 },
+      progressLogs: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
 
@@ -36,6 +36,7 @@ export default async function BookPage({
 
   const updateAction = updateShelfEntry.bind(null, bookId);
   const addTenAction = addTenPages.bind(null, bookId);
+  const deleteAction = deleteBook.bind(null, bookId);
   const progressPercent: number | null =
     entry.currentPercent ??
     (entry.book.pageCount && entry.currentPage > 0
@@ -80,6 +81,11 @@ export default async function BookPage({
         <form action={addTenAction}>
           <button className="w-full rounded-md bg-[var(--accent)] px-4 py-2 font-semibold text-[#12100e] hover:bg-[var(--accent-strong)]">
             +10 pages
+          </button>
+        </form>
+        <form action={deleteAction}>
+          <button className="w-full rounded-md border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950">
+            Remove book
           </button>
         </form>
       </aside>
@@ -179,11 +185,12 @@ export default async function BookPage({
           </div>
 
           <label className="grid gap-1 text-sm font-medium">
-            Notes
+            Session notes <span className="font-normal text-[var(--muted)]">(saved with this session, then cleared)</span>
             <textarea
               className="min-h-32 rounded-md border border-[var(--line)] px-3 py-2"
-              defaultValue={entry.notes ?? ""}
+              defaultValue=""
               name="notes"
+              placeholder="What did you read? What stood out?"
             />
           </label>
 
@@ -193,15 +200,50 @@ export default async function BookPage({
         </form>
 
         <section className="rounded-md border border-[var(--line)] bg-[var(--surface)] p-4">
-          <h2 className="font-semibold">Recent Progress</h2>
-          <div className="mt-3 space-y-2 text-sm text-[var(--muted)]">
-            {entry.progressLogs.map((log) => (
-              <p key={log.id}>
-                Page {log.currentPage} on {log.createdAt.toLocaleDateString()}
-              </p>
-            ))}
+          <h2 className="font-semibold">Reading Journal</h2>
+          <div className="mt-3 space-y-4">
+            {entry.progressLogs.map((log) => {
+              const deleteAction = deleteProgressLog.bind(null, bookId, log.id);
+              const position = log.currentPercent !== null
+                ? `${log.currentPercent}%`
+                : `page ${log.currentPage}`;
+
+              return (
+                <div
+                  className="border-l-2 border-[var(--line)] pl-3 text-sm"
+                  key={log.id}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[var(--muted)]">
+                      {log.createdAt.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                      {" · "}
+                      {position}
+                    </span>
+                    <form action={deleteAction}>
+                      <button
+                        className="text-xs text-[var(--muted)] hover:text-red-400"
+                        type="submit"
+                      >
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                  {log.notes ? (
+                    <p className="mt-1 whitespace-pre-wrap text-[var(--foreground)]">
+                      {log.notes}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
             {entry.progressLogs.length === 0 ? (
-              <p>No progress updates yet.</p>
+              <p className="text-sm text-[var(--muted)]">
+                No sessions logged yet.
+              </p>
             ) : null}
           </div>
         </section>

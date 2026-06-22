@@ -201,15 +201,30 @@ export async function updateShelfEntry(bookId: number, formData: FormData) {
         startedAt: hasBlankStartedAt ? null : dates.startedAt,
         finishedAt: hasBlankFinishedAt ? null : dates.finishedAt,
         rating,
-        notes,
+        notes: null,
       },
     }),
     prisma.progressLog.create({
-      data: { shelfEntryId: entry.id, currentPage },
+      data: { shelfEntryId: entry.id, currentPage, currentPercent, notes: notes || null },
     }),
   ]);
 
   revalidatePath("/");
+  revalidatePath(`/books/${bookId}`);
+}
+
+export async function deleteBook(bookId: number) {
+  await prisma.book.delete({ where: { id: bookId } });
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function deleteProgressLog(bookId: number, logId: number) {
+  const entry = await prisma.shelfEntry.findUniqueOrThrow({ where: { bookId } });
+  await prisma.progressLog.deleteMany({
+    where: { id: logId, shelfEntryId: entry.id },
+  });
+
   revalidatePath(`/books/${bookId}`);
 }
 
