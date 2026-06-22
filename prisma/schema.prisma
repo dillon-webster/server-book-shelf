@@ -31,6 +31,7 @@ model ShelfEntry {
   bookId       Int           @unique
   status       ShelfStatus   @default(WANT_TO_READ)
   currentPage  Int           @default(0)
+  currentPercent Float?
   startedAt    DateTime?
   finishedAt   DateTime?
   rating       Int?

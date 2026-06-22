@@ -15,6 +15,31 @@ function parseOptionalInt(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseOptionalFloat(value: FormDataEntryValue | null): number | null {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function resolveProgress(
+  rawPage: number | null,
+  rawPercent: number | null,
+  pageCount: number | null,
+): { currentPage: number; currentPercent: number | null } {
+  if (rawPercent !== null) {
+    const percent = Math.min(100, Math.max(0, rawPercent));
+    const page = pageCount ? Math.round((percent / 100) * pageCount) : 0;
+    return { currentPage: page, currentPercent: percent };
+  }
+
+  const page = rawPage ?? 0;
+  const percent = pageCount && page > 0 ? Math.round((page / pageCount) * 100) : null;
+  return { currentPage: page, currentPercent: percent };
+}
+
 function parseOptionalDate(value: FormDataEntryValue | null): Date | null {
   if (typeof value !== "string" || value.trim() === "") {
     return null;
@@ -139,10 +164,14 @@ export async function updateShelfEntry(bookId: number, formData: FormData) {
     include: { book: true },
   });
   const status = parseStatus(formData.get("status"));
-  const currentPage = clampCurrentPage(
-    parseOptionalInt(formData.get("currentPage")) ?? 0,
+  const rawPage = parseOptionalInt(formData.get("currentPage"));
+  const rawPercent = parseOptionalFloat(formData.get("currentPercent"));
+  const { currentPage: resolvedPage, currentPercent } = resolveProgress(
+    rawPage,
+    rawPercent,
     entry.book.pageCount,
   );
+  const currentPage = clampCurrentPage(resolvedPage, entry.book.pageCount);
   const hasBlankStartedAt = hasBlankDateField(formData, "startedAt");
   const hasBlankFinishedAt = hasBlankDateField(formData, "finishedAt");
   const dates = deriveShelfDates({
@@ -168,6 +197,7 @@ export async function updateShelfEntry(bookId: number, formData: FormData) {
       data: {
         status,
         currentPage,
+        currentPercent,
         startedAt: hasBlankStartedAt ? null : dates.startedAt,
         finishedAt: hasBlankFinishedAt ? null : dates.finishedAt,
         rating,

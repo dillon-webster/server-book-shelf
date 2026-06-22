@@ -36,15 +36,23 @@ export default async function BookPage({
 
   const updateAction = updateShelfEntry.bind(null, bookId);
   const addTenAction = addTenPages.bind(null, bookId);
+  const progressPercent: number | null =
+    entry.currentPercent ??
+    (entry.book.pageCount && entry.currentPage > 0
+      ? Math.min(100, Math.round((entry.currentPage / entry.book.pageCount) * 100))
+      : null);
+
   const progressText = entry.book.pageCount
     ? `${entry.currentPage}/${entry.book.pageCount} pages`
-    : `${entry.currentPage} pages`;
+    : entry.currentPercent !== null
+      ? `${entry.currentPercent}%`
+      : `${entry.currentPage} pages`;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="space-y-4">
         <div className="overflow-hidden rounded-md border border-[var(--line)] bg-[var(--surface)]">
-          <div className="aspect-[2/3] bg-slate-200">
+          <div className="aspect-[2/3] bg-[var(--line)]">
             {entry.book.coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -54,9 +62,23 @@ export default async function BookPage({
               />
             ) : null}
           </div>
+          {progressPercent !== null ? (
+            <div className="px-3 py-2">
+              <div className="mb-1 flex justify-between text-xs text-[var(--muted)]">
+                <span>{progressText}</span>
+                <span>{progressPercent}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--line)]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)]"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
         <form action={addTenAction}>
-          <button className="w-full rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-white hover:bg-[var(--accent-strong)]">
+          <button className="w-full rounded-md bg-[var(--accent)] px-4 py-2 font-semibold text-[#12100e] hover:bg-[var(--accent-strong)]">
             +10 pages
           </button>
         </form>
@@ -94,12 +116,27 @@ export default async function BookPage({
             </label>
 
             <label className="grid gap-1 text-sm font-medium">
+              Progress % <span className="font-normal text-[var(--muted)]">(Kindle)</span>
+              <input
+                className="rounded-md border border-[var(--line)] px-3 py-2"
+                defaultValue={entry.currentPercent ?? ""}
+                max="100"
+                min="0"
+                name="currentPercent"
+                placeholder="e.g. 42"
+                step="0.1"
+                type="number"
+              />
+            </label>
+
+            <label className="grid gap-1 text-sm font-medium">
               Current page
               <input
                 className="rounded-md border border-[var(--line)] px-3 py-2"
-                defaultValue={entry.currentPage}
+                defaultValue={entry.currentPage || ""}
                 min="0"
                 name="currentPage"
+                placeholder="e.g. 124"
                 type="number"
               />
             </label>
@@ -150,7 +187,7 @@ export default async function BookPage({
             />
           </label>
 
-          <button className="w-fit rounded-md bg-[var(--foreground)] px-4 py-2 font-medium text-white">
+          <button className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-semibold text-[#12100e] hover:bg-[var(--accent-strong)]">
             Save
           </button>
         </form>

@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light;
-  --background: #f6f7f8;
-  --foreground: #1f2933;
-  --muted: #64748b;
-  --line: #d7dde4;
-  --surface: #ffffff;
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
+  color-scheme: dark;
+  --background: #12100e;
+  --foreground: #e8dcc8;
+  --muted: #9e8e76;
+  --line: #37312a;
+  --surface: #1e1a16;
+  --surface-raised: #272219;
+  --accent: #c8923a;
+  --accent-strong: #ad7b28;
 }
 
 * {
@@ -19,7 +20,12 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+h1,
+h2 {
+  font-family: var(--font-serif), Georgia, serif;
 }
 
 a {
@@ -36,4 +42,16 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  background-color: var(--surface);
+  color: var(--foreground);
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) sepia(0.3);
 }
