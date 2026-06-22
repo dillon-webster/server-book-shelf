@@ -44,9 +44,9 @@ test("keeps partial Open Library records usable", () => {
 
 test("passes an abort signal when searching Open Library", async (t) => {
   let requestUrl = "";
-  let requestInit: (RequestInit & { next?: { revalidate?: number } }) | undefined;
+  let requestInit: Parameters<typeof fetch>[1] | undefined;
 
-  t.mock.method(globalThis, "fetch", async (url, init) => {
+  t.mock.method(globalThis, "fetch", async (...[url, init]: Parameters<typeof fetch>) => {
     requestUrl = String(url);
     requestInit = init;
 
@@ -62,6 +62,7 @@ test("passes an abort signal when searching Open Library", async (t) => {
 
   const results = await searchOpenLibrary("left hand");
   const url = new URL(requestUrl);
+  const headers = requestInit?.headers;
 
   assert.equal(url.origin, "https://openlibrary.org");
   assert.equal(url.pathname, "/search.json");
@@ -71,7 +72,8 @@ test("passes an abort signal when searching Open Library", async (t) => {
     "key,title,author_name,cover_i,number_of_pages_median",
   );
   assert.equal(url.searchParams.get("limit"), "12");
-  assert.equal(requestInit?.headers?.["Accept"], "application/json");
+  assert.ok(headers && !Array.isArray(headers) && !(headers instanceof Headers));
+  assert.equal((headers as Record<string, string>).Accept, "application/json");
   assert.equal(requestInit?.next?.revalidate, 3600);
   assert.ok(requestInit?.signal instanceof AbortSignal);
   assert.deepEqual(results, [
