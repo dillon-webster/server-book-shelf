@@ -73,6 +73,12 @@ function getOptionalDateField(
   return parseOptionalDate(formData.get(name));
 }
 
+function hasBlankDateField(formData: FormData, name: string): boolean {
+  const value = formData.get(name);
+
+  return typeof value === "string" && value.trim() === "";
+}
+
 export async function addBook(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const externalId = String(formData.get("externalId") ?? "").trim();
@@ -137,6 +143,8 @@ export async function updateShelfEntry(bookId: number, formData: FormData) {
     parseOptionalInt(formData.get("currentPage")) ?? 0,
     entry.book.pageCount,
   );
+  const hasBlankStartedAt = hasBlankDateField(formData, "startedAt");
+  const hasBlankFinishedAt = hasBlankDateField(formData, "finishedAt");
   const dates = deriveShelfDates({
     status,
     previousStartedAt: getOptionalDateField(
@@ -160,8 +168,8 @@ export async function updateShelfEntry(bookId: number, formData: FormData) {
       data: {
         status,
         currentPage,
-        startedAt: dates.startedAt,
-        finishedAt: dates.finishedAt,
+        startedAt: hasBlankStartedAt ? null : dates.startedAt,
+        finishedAt: hasBlankFinishedAt ? null : dates.finishedAt,
         rating,
         notes,
       },
