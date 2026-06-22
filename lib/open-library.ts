@@ -47,10 +47,17 @@ export async function searchOpenLibrary(
     fields: "key,title,author_name,cover_i,number_of_pages_median",
     limit: "12",
   });
-  const response = await fetch(`https://openlibrary.org/search.json?${params}`, {
-    headers: { Accept: "application/json" },
-    next: { revalidate: 3600 },
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`https://openlibrary.org/search.json?${params}`, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    throw new Error("Open Library search failed");
+  }
 
   if (!response.ok) {
     throw new Error("Open Library search failed");
