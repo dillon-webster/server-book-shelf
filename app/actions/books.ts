@@ -2,8 +2,10 @@
 
 import type { ShelfStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { generateSpine } from "@/lib/spine";
 import { clampCurrentPage, deriveStatusDates } from "@/lib/progress";
 
 function parseOptionalInt(value: FormDataEntryValue | null): number | null {
@@ -153,6 +155,8 @@ export async function addBook(formData: FormData) {
 
     return book;
   });
+
+  after(() => generateSpine(book.id));
 
   revalidatePath("/");
   redirect(`/books/${book.id}`);

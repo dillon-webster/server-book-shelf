@@ -15,15 +15,16 @@ enum ShelfStatus {
 }
 
 model Book {
-  id         Int         @id @default(autoincrement())
-  title      String
-  author     String?
-  coverUrl   String?
-  pageCount  Int?
-  externalId String?     @unique
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  shelfEntry ShelfEntry?
+  id             Int         @id @default(autoincrement())
+  title          String
+  author         String?
+  coverUrl       String?
+  spineImageData String?     @db.Text
+  pageCount      Int?
+  externalId     String?     @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  shelfEntry     ShelfEntry?
 }
 
 model ShelfEntry {
