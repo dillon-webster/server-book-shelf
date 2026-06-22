@@ -40,7 +40,12 @@ async function extractColors(coverUrl: string, ai: GoogleGenAI): Promise<SpineCo
   }
 }
 
+function spineTitle(title: string): string {
+  return title.replace(/\s*\([^)]*\)/g, '').replace(/\s*:.+$/, '').trim();
+}
+
 function buildSpineSVG(title: string, c: SpineColors): string {
+  title = spineTitle(title);
   const W = 60;
   const H = 300;
 
