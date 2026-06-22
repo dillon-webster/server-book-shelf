@@ -24,6 +24,7 @@ export default async function AddBookPage({
 
       <form className="flex max-w-2xl gap-2">
         <input
+          aria-label="Search books"
           className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2"
           defaultValue={query}
           name="q"
@@ -78,6 +79,7 @@ export default async function AddBookPage({
                   value={book.pageCount ?? ""}
                 />
                 <select
+                  aria-label={`Shelf for ${book.title}`}
                   className="max-w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm"
                   name="status"
                 >

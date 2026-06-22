@@ -15,11 +15,12 @@ export default async function BookPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const bookId = Number.parseInt(id, 10);
 
-  if (!Number.isFinite(bookId)) {
+  if (!/^\d+$/.test(id)) {
     notFound();
   }
+
+  const bookId = Number(id);
 
   const entry = await prisma.shelfEntry.findUnique({
     where: { bookId },
