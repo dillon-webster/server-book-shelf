@@ -20,6 +20,7 @@ model Book {
   author         String?
   coverUrl       String?
   spineImageData String?     @db.Text
+  epubPath       String?
   pageCount      Int?
   externalId     String?     @unique
   createdAt      DateTime    @default(now())

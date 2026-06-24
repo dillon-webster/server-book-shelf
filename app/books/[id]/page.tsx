@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { addTenPages, deleteBook, deleteProgressLog, updateShelfEntry } from "@/app/actions/books";
 import { prisma } from "@/lib/prisma";
 import { shelfLabels, shelfOrder } from "@/lib/shelves";
+import EpubUpload from "@/app/components/EpubUpload";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function BookPage({
   const entry = await prisma.shelfEntry.findUnique({
     where: { bookId },
     include: {
-      book: true,
+      book: { select: { id: true, title: true, author: true, coverUrl: true, pageCount: true, epubPath: true } },
       progressLogs: { orderBy: { createdAt: "desc" }, take: 20 },
     },
   });
@@ -83,6 +84,8 @@ export default async function BookPage({
             +10 pages
           </button>
         </form>
+        <EpubUpload bookId={bookId} hasEpub={!!entry.book.epubPath} />
+
         <form action={deleteAction}>
           <button className="w-full rounded-md border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950">
             Remove book
