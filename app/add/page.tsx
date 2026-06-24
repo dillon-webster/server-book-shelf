@@ -22,7 +22,7 @@ export default async function AddBookPage({
         </p>
       </div>
 
-      <form className="flex max-w-2xl gap-2">
+      <form action="/add" className="flex max-w-2xl gap-2">
         <input
           aria-label="Search books"
           className="min-w-0 flex-1 rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2"

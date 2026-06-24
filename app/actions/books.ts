@@ -159,7 +159,7 @@ export async function addBook(formData: FormData) {
   after(() => generateSpine(book.id));
 
   revalidatePath("/");
-  redirect(`/books/${book.id}`);
+  redirect(status === "WANT_TO_READ" ? "/" : `/books/${book.id}`);
 }
 
 export async function updateShelfEntry(bookId: number, formData: FormData) {
