@@ -34,6 +34,7 @@ model ShelfEntry {
   status       ShelfStatus   @default(WANT_TO_READ)
   currentPage  Int           @default(0)
   currentPercent Float?
+  epubCfi      String?       @db.Text
   startedAt    DateTime?
   finishedAt   DateTime?
   rating       Int?

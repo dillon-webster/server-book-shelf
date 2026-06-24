@@ -2,28 +2,101 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import type { Location, Rendition } from 'epubjs';
+import { deriveEpubLocationPercentage } from '@/lib/progress';
 
-export default function EpubReader({ bookId, backHref }: { bookId: number; backHref: string }) {
+function getCurrentLocation(rendition: Rendition) {
+  return rendition.currentLocation() as unknown as Location | undefined;
+}
+
+function sameLocation(a?: Location, b?: Location) {
+  return !!a && !!b && a.start?.cfi === b.start?.cfi && a.end?.cfi === b.end?.cfi;
+}
+
+type ReadingProgress = {
+  epubCfi: string;
+  percentage: number;
+};
+
+function getSpineLength(rendition: Rendition) {
+  return (
+    rendition.book as unknown as { spine?: { spineItems?: unknown[] } }
+  ).spine?.spineItems?.length ?? 0;
+}
+
+export default function EpubReader({
+  bookId,
+  backHref,
+  initialCfi,
+}: {
+  bookId: number;
+  backHref: string;
+  initialCfi: string | null;
+}) {
   const viewerRef = useRef<HTMLDivElement>(null);
-  const renditionRef = useRef<import('epubjs').Rendition | null>(null);
+  const renditionRef = useRef<Rendition | null>(null);
+  const navigatingRef = useRef(false);
+  const saveInFlightRef = useRef(false);
+  const pendingProgressRef = useRef<ReadingProgress | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
   const [toc, setToc] = useState<{ label: string; href: string }[]>([]);
   const [showUi, setShowUi] = useState(false);
 
+  const flushProgressSave = useCallback(async () => {
+    if (saveInFlightRef.current) return;
+
+    saveInFlightRef.current = true;
+    try {
+      while (pendingProgressRef.current) {
+        const progress = pendingProgressRef.current;
+        pendingProgressRef.current = null;
+
+        const res = await fetch(`/api/books/${bookId}/reading-progress`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(progress),
+          keepalive: true,
+        });
+
+        if (!res.ok) throw new Error('Failed to save reading progress');
+      }
+    } catch {
+      // Autosave is best-effort; keep reading smooth and try again on the next page turn.
+    } finally {
+      saveInFlightRef.current = false;
+    }
+  }, [bookId]);
+
+  const queueProgressSave = useCallback((progress: ReadingProgress) => {
+    pendingProgressRef.current = progress;
+    void flushProgressSave();
+  }, [flushProgressSave]);
+
   useEffect(() => {
     let book: import('epubjs').Book;
+    let cancelled = false;
+
+    function disableIframePointerEvents() {
+      viewerRef.current?.querySelectorAll('iframe').forEach((frame) => {
+        frame.style.pointerEvents = 'none';
+      });
+    }
 
     async function init() {
       const ePub = (await import('epubjs')).default;
       const res = await fetch(`/api/books/${bookId}/epub`);
       const buffer = await res.arrayBuffer();
+      if (cancelled) return;
       book = ePub(buffer);
 
       const container = viewerRef.current!;
       const rendition = book.renderTo(container, {
-        width: window.innerWidth,
-        height: window.innerHeight,
+        manager: 'continuous',
+        width: '100%',
+        height: '100%',
         flow: 'paginated',
+        spread: 'none',
+        snap: true,
       });
       renditionRef.current = rendition;
 
@@ -39,29 +112,86 @@ export default function EpubReader({ bookId, backHref }: { bookId: number; backH
         a: { color: '#c8923a !important' },
       });
 
-      rendition.on('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'ArrowLeft') rendition.prev();
-        if (e.key === 'ArrowRight') rendition.next();
+      const saveLocation = (location: Location) => {
+        if (!location.start?.cfi) return;
+        const percentage = deriveEpubLocationPercentage({
+          generatedPercentage: location.start.percentage,
+          spineIndex: location.start.index,
+          spineLength: getSpineLength(rendition),
+          displayedPage: location.start.displayed.page,
+          displayedTotal: location.start.displayed.total,
+        });
+        queueProgressSave({
+          epubCfi: location.start.cfi,
+          percentage,
+        });
+      };
+
+      rendition.on('rendered', disableIframePointerEvents);
+      rendition.on('relocated', saveLocation);
+
+      try {
+        await rendition.display(initialCfi ?? undefined);
+      } catch {
+        await rendition.display();
+      }
+      disableIframePointerEvents();
+
+      void book.locations.generate(1600).then(() => {
+        if (!cancelled) void rendition.reportLocation();
       });
 
-      await rendition.display();
-
-      // Disable pointer events on the iframe so our overlay receives them
-      container.querySelectorAll('iframe').forEach((f) => {
-        f.style.pointerEvents = 'none';
-      });
+      const resize = () => {
+        const rect = container.getBoundingClientRect();
+        rendition.resize(Math.floor(rect.width), Math.floor(rect.height));
+      };
+      window.addEventListener('resize', resize);
 
       const navItems = await book.loaded.navigation;
+      if (cancelled) return;
       setToc(navItems.toc.map((item) => ({ label: item.label.trim(), href: item.href })));
+
+      return () => window.removeEventListener('resize', resize);
     }
 
-    init();
-    return () => { renditionRef.current?.destroy(); book?.destroy(); };
-  }, [bookId]);
+    let cleanup: (() => void) | undefined;
+    init().then((fn) => { cleanup = fn; });
 
-  function prev() { renditionRef.current?.prev(); }
-  function next() { renditionRef.current?.next(); }
-  function goTo(href: string) { renditionRef.current?.display(href); setShowUi(false); }
+    return () => {
+      cancelled = true;
+      cleanup?.();
+      renditionRef.current?.destroy();
+      renditionRef.current = null;
+      book?.destroy();
+    };
+  }, [bookId, initialCfi, queueProgressSave]);
+
+  const navigate = useCallback(async (direction: 'prev' | 'next') => {
+    const rendition = renditionRef.current;
+    if (!rendition || navigatingRef.current) return;
+
+    navigatingRef.current = true;
+    try {
+      const before = getCurrentLocation(rendition);
+      await rendition[direction]();
+      const after = getCurrentLocation(rendition);
+
+      if (direction === 'next' && sameLocation(before, after) && before?.end?.cfi) {
+        await rendition.display(before.end.cfi);
+      } else if (direction === 'prev' && sameLocation(before, after) && before?.start?.cfi) {
+        await rendition.display(before.start.cfi);
+      }
+    } finally {
+      navigatingRef.current = false;
+    }
+  }, []);
+
+  const prev = useCallback(() => { void navigate('prev'); }, [navigate]);
+  const next = useCallback(() => { void navigate('next'); }, [navigate]);
+  const goTo = useCallback((href: string) => {
+    void renditionRef.current?.display(href);
+    setShowUi(false);
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -71,7 +201,7 @@ export default function EpubReader({ bookId, backHref }: { bookId: number; backH
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [next, prev]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -100,26 +230,31 @@ export default function EpubReader({ bookId, backHref }: { bookId: number; backH
       else if (x > third * 2) next();
       else setShowUi((v) => !v);
     }
-  }, []);
+  }, [next, prev]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#140d06', zIndex: 50, display: 'flex', flexDirection: 'column' }}>
 
-      {/* epub.js renders here — pointer-events disabled so overlay receives all events */}
       <div
         ref={viewerRef}
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }}
       />
 
-      {/* Navigation overlay — on top of viewer */}
       <div
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         style={{ position: 'absolute', inset: 0, zIndex: 10, touchAction: 'none' }}
       />
 
-      {/* Always-visible bottom nav */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'linear-gradient(to top, rgba(20,13,6,0.97) 80%, transparent)' }}>
+      <style>{`
+        @media (max-width: 768px), (pointer: coarse) {
+          .epub-reader-bottom-nav {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      <div className="epub-reader-bottom-nav" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'linear-gradient(to top, rgba(20,13,6,0.97) 80%, transparent)' }}>
         <button onClick={prev} style={navBtn}>← Prev</button>
         <button onClick={() => setShowUi((v) => !v)} style={{ ...navBtn, color: '#c8923a' }}>Menu</button>
         <button onClick={next} style={navBtn}>Next →</button>

@@ -16,7 +16,11 @@ export default async function ReadPage({
   const bookId = Number(id);
   const book = await prisma.book.findUnique({
     where: { id: bookId },
-    select: { title: true, epubPath: true },
+    select: {
+      title: true,
+      epubPath: true,
+      shelfEntry: { select: { epubCfi: true } },
+    },
   });
 
   if (!book) notFound();
@@ -32,5 +36,11 @@ export default async function ReadPage({
     );
   }
 
-  return <EpubReader bookId={bookId} backHref={`/books/${bookId}`} />;
+  return (
+    <EpubReader
+      bookId={bookId}
+      backHref={`/books/${bookId}`}
+      initialCfi={book.shelfEntry?.epubCfi ?? null}
+    />
+  );
 }
