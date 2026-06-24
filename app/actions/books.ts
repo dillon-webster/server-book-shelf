@@ -232,6 +232,28 @@ export async function deleteProgressLog(bookId: number, logId: number) {
   revalidatePath(`/books/${bookId}`);
 }
 
+export async function resetBookProgress(bookId: number) {
+  const entry = await prisma.shelfEntry.findUniqueOrThrow({ where: { bookId } });
+
+  await prisma.$transaction([
+    prisma.progressLog.deleteMany({
+      where: { shelfEntryId: entry.id },
+    }),
+    prisma.shelfEntry.update({
+      where: { id: entry.id },
+      data: {
+        currentPage: 0,
+        currentPercent: null,
+        epubCfi: null,
+      },
+    }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath(`/books/${bookId}`);
+  revalidatePath(`/books/${bookId}/read`);
+}
+
 export async function addTenPages(bookId: number) {
   const entry = await prisma.shelfEntry.findUniqueOrThrow({
     where: { bookId },

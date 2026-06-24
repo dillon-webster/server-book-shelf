@@ -1,5 +1,11 @@
 import { notFound } from "next/navigation";
-import { addTenPages, deleteBook, deleteProgressLog, updateShelfEntry } from "@/app/actions/books";
+import {
+  addTenPages,
+  deleteBook,
+  deleteProgressLog,
+  resetBookProgress,
+  updateShelfEntry,
+} from "@/app/actions/books";
 import { prisma } from "@/lib/prisma";
 import { shelfLabels, shelfOrder } from "@/lib/shelves";
 import EpubUpload from "@/app/components/EpubUpload";
@@ -38,6 +44,7 @@ export default async function BookPage({
   const updateAction = updateShelfEntry.bind(null, bookId);
   const addTenAction = addTenPages.bind(null, bookId);
   const deleteAction = deleteBook.bind(null, bookId);
+  const resetProgressAction = resetBookProgress.bind(null, bookId);
   const progressPercent: number | null =
     entry.currentPercent ??
     (entry.book.pageCount && entry.currentPage > 0
@@ -85,6 +92,12 @@ export default async function BookPage({
           </button>
         </form>
         <EpubUpload bookId={bookId} hasEpub={!!entry.book.epubPath} />
+
+        <form action={resetProgressAction}>
+          <button className="w-full rounded-md border border-[var(--line)] px-4 py-2 text-sm text-[var(--muted)] hover:border-red-900 hover:bg-red-950 hover:text-red-300">
+            Clear progress
+          </button>
+        </form>
 
         <form action={deleteAction}>
           <button className="w-full rounded-md border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950">

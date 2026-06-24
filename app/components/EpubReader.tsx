@@ -37,6 +37,9 @@ export default function EpubReader({
   const renditionRef = useRef<Rendition | null>(null);
   const navigatingRef = useRef(false);
   const saveInFlightRef = useRef(false);
+  const saveArmedRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
+  const latestLocationRef = useRef<Location | null>(null);
   const pendingProgressRef = useRef<ReadingProgress | null>(null);
   const pointerStartRef = useRef<{ x: number; y: number; t: number; id: number } | null>(null);
   const [toc, setToc] = useState<{ label: string; href: string }[]>([]);
@@ -71,6 +74,33 @@ export default function EpubReader({
     pendingProgressRef.current = progress;
     void flushProgressSave();
   }, [flushProgressSave]);
+
+  const queueLocationSave = useCallback((rendition: Rendition, location: Location) => {
+    if (!saveArmedRef.current || !location.start?.cfi) return;
+
+    latestLocationRef.current = location;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      const locationToSave = latestLocationRef.current;
+      latestLocationRef.current = null;
+      saveArmedRef.current = false;
+      if (!locationToSave?.start?.cfi) return;
+
+      const percentage = deriveEpubLocationPercentage({
+        generatedPercentage: locationToSave.start.percentage,
+        spineIndex: locationToSave.start.index,
+        spineLength: getSpineLength(rendition),
+        displayedPage: locationToSave.start.displayed.page,
+        displayedTotal: locationToSave.start.displayed.total,
+      });
+      queueProgressSave({
+        epubCfi: locationToSave.start.cfi,
+        percentage,
+      });
+    }, 250);
+  }, [queueProgressSave]);
 
   useEffect(() => {
     let book: import('epubjs').Book;
@@ -112,20 +142,7 @@ export default function EpubReader({
         a: { color: '#c8923a !important' },
       });
 
-      const saveLocation = (location: Location) => {
-        if (!location.start?.cfi) return;
-        const percentage = deriveEpubLocationPercentage({
-          generatedPercentage: location.start.percentage,
-          spineIndex: location.start.index,
-          spineLength: getSpineLength(rendition),
-          displayedPage: location.start.displayed.page,
-          displayedTotal: location.start.displayed.total,
-        });
-        queueProgressSave({
-          epubCfi: location.start.cfi,
-          percentage,
-        });
-      };
+      const saveLocation = (location: Location) => queueLocationSave(rendition, location);
 
       rendition.on('rendered', disableIframePointerEvents);
       rendition.on('relocated', saveLocation);
@@ -136,10 +153,6 @@ export default function EpubReader({
         await rendition.display();
       }
       disableIframePointerEvents();
-
-      void book.locations.generate(1600).then(() => {
-        if (!cancelled) void rendition.reportLocation();
-      });
 
       const resize = () => {
         const rect = container.getBoundingClientRect();
@@ -160,17 +173,35 @@ export default function EpubReader({
     return () => {
       cancelled = true;
       cleanup?.();
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+      const locationToSave = latestLocationRef.current;
+      if (saveArmedRef.current && locationToSave?.start?.cfi && renditionRef.current) {
+        queueProgressSave({
+          epubCfi: locationToSave.start.cfi,
+          percentage: deriveEpubLocationPercentage({
+            generatedPercentage: locationToSave.start.percentage,
+            spineIndex: locationToSave.start.index,
+            spineLength: getSpineLength(renditionRef.current),
+            displayedPage: locationToSave.start.displayed.page,
+            displayedTotal: locationToSave.start.displayed.total,
+          }),
+        });
+      }
+      latestLocationRef.current = null;
+      saveArmedRef.current = false;
       renditionRef.current?.destroy();
       renditionRef.current = null;
       book?.destroy();
     };
-  }, [bookId, initialCfi, queueProgressSave]);
+  }, [bookId, initialCfi, queueLocationSave, queueProgressSave]);
 
   const navigate = useCallback(async (direction: 'prev' | 'next') => {
     const rendition = renditionRef.current;
     if (!rendition || navigatingRef.current) return;
 
     navigatingRef.current = true;
+    saveArmedRef.current = true;
     try {
       const before = getCurrentLocation(rendition);
       await rendition[direction]();
@@ -189,6 +220,7 @@ export default function EpubReader({
   const prev = useCallback(() => { void navigate('prev'); }, [navigate]);
   const next = useCallback(() => { void navigate('next'); }, [navigate]);
   const goTo = useCallback((href: string) => {
+    saveArmedRef.current = true;
     void renditionRef.current?.display(href);
     setShowUi(false);
   }, []);
