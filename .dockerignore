@@ -13,3 +13,4 @@ build
 coverage
 tsconfig.tsbuildinfo
 .DS_Store
+uploads

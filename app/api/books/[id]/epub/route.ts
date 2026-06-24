@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, readFile } from "fs/promises";
-import path from "path";
 import { prisma } from "@/lib/prisma";
-
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+import { readEpubFile, saveEpubFile } from "@/lib/epub-storage";
 
 export async function POST(
   req: NextRequest,
@@ -19,8 +16,7 @@ export async function POST(
   if (!file.name.endsWith(".epub")) return NextResponse.json({ error: "Must be an EPUB file" }, { status: 400 });
 
   const bytes = await file.arrayBuffer();
-  const filename = `book-${bookId}.epub`;
-  await writeFile(path.join(UPLOADS_DIR, filename), Buffer.from(bytes));
+  const filename = await saveEpubFile({ bookId, bytes: Buffer.from(bytes) });
 
   await prisma.book.update({ where: { id: bookId }, data: { epubPath: filename } });
 
@@ -38,10 +34,9 @@ export async function GET(
   const book = await prisma.book.findUnique({ where: { id: bookId }, select: { epubPath: true } });
   if (!book?.epubPath) return NextResponse.json({ error: "No epub" }, { status: 404 });
 
-  const filePath = path.join(UPLOADS_DIR, book.epubPath);
-  const buffer = await readFile(filePath);
+  const buffer = await readEpubFile(book.epubPath);
 
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/epub+zip",
       "Content-Disposition": `inline; filename="${book.epubPath}"`,

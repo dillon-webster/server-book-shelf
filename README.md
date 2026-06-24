@@ -46,6 +46,12 @@ docker compose up --build
 
 App runs at `http://localhost:3003`.
 
+EPUB uploads are stored in `./uploads` by default. On a server, point them at a mounted drive:
+
+```bash
+HOST_EPUB_UPLOADS_DIR=/path/to/5tb-drive/bookshelf-uploads docker compose up --build -d
+```
+
 ## Database
 
 ```bash

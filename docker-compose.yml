@@ -29,6 +29,9 @@ services:
       - "3003:3000"
     environment:
       DATABASE_URL: postgresql://bookshelf:bookshelf@bookshelf-db:5432/bookshelf?schema=public
+      EPUB_UPLOADS_DIR: /app/uploads
+    volumes:
+      - ${HOST_EPUB_UPLOADS_DIR:-./uploads}:/app/uploads
 
 volumes:
   bookshelf-postgres:

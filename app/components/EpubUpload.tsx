@@ -7,15 +7,29 @@ export default function EpubUpload({ bookId, hasEpub }: { bookId: number; hasEpu
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(hasEpub);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith('.epub')) return;
     setUploading(true);
-    const fd = new FormData();
-    fd.append('epub', file);
-    await fetch(`/api/books/${bookId}/epub`, { method: 'POST', body: fd });
-    setUploading(false);
-    setUploaded(true);
+    setError(null);
+
+    try {
+      const fd = new FormData();
+      fd.append('epub', file);
+      const res = await fetch(`/api/books/${bookId}/epub`, { method: 'POST', body: fd });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.error ?? 'Upload failed');
+      }
+
+      setUploaded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -35,6 +49,7 @@ export default function EpubUpload({ bookId, hasEpub }: { bookId: number; hasEpu
       >
         {uploading ? 'Uploading…' : uploaded ? 'Replace EPUB' : 'Upload EPUB'}
       </button>
+      {error && <p className="text-sm text-red-400">{error}</p>}
       <input
         ref={inputRef}
         type="file"
