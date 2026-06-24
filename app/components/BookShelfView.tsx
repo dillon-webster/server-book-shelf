@@ -42,6 +42,11 @@ function spineColor(bookId: number): string {
   return SPINE_COLORS[bookId % SPINE_COLORS.length];
 }
 
+function spineHeight(pageCount: number | null): number {
+  if (!pageCount) return 100;
+  return Math.round(Math.min(130, Math.max(80, 80 + (pageCount / 600) * 50)));
+}
+
 function progressLabel(
   currentPage: number,
   pageCount: number | null,
@@ -114,6 +119,7 @@ function BookSpine({
 }) {
   const bg = spineColor(entry.bookId);
   const spineImg = entry.spineImageData || entry.coverUrl;
+  const h = spineHeight(entry.pageCount);
 
   if (isSelected) {
     return (
@@ -122,7 +128,7 @@ function BookSpine({
         title={entry.title}
         style={{
           width: '80px',
-          height: '120px',
+          height: `${Math.round(h * 1.2)}px`,
           borderRadius: '3px 3px 0 0',
           border: `2px solid ${accentColor}`,
           boxShadow: `0 0 12px ${accentColor}55, 0 6px 20px rgba(0,0,0,0.6)`,
@@ -178,7 +184,7 @@ function BookSpine({
       title={entry.title}
       style={{
         width: '32px',
-        height: '100px',
+        height: `${h}px`,
         borderRadius: '2px 2px 0 0',
         border: '1px solid rgba(255,255,255,0.08)',
         transform: 'translateY(0)',
