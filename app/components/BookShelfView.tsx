@@ -52,11 +52,11 @@ function progressLabel(
   pageCount: number | null,
   currentPercent: number | null,
 ): string | null {
-  if (pageCount) {
-    return `${currentPage} / ${pageCount} pages`;
-  }
   if (currentPercent !== null) {
     return `${currentPercent}%`;
+  }
+  if (pageCount) {
+    return `${currentPage} / ${pageCount} pages`;
   }
   return currentPage > 0 ? `${currentPage} pages read` : null;
 }
@@ -66,11 +66,11 @@ function progressPercent(
   pageCount: number | null,
   currentPercent: number | null,
 ): number | null {
-  if (pageCount && pageCount > 0) {
-    return Math.min(100, Math.round((currentPage / pageCount) * 100));
-  }
   if (currentPercent !== null) {
     return Math.min(100, currentPercent);
+  }
+  if (pageCount && pageCount > 0) {
+    return Math.min(100, Math.round((currentPage / pageCount) * 100));
   }
   return null;
 }

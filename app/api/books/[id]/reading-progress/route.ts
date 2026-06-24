@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { deriveReadingProgress } from "@/lib/progress";
 
 type ReadingProgressPayload = {
   epubCfi?: unknown;
@@ -9,19 +8,22 @@ type ReadingProgressPayload = {
 
 function parsePayload(payload: ReadingProgressPayload): {
   epubCfi: string;
-  percentage: number;
+  percentage: number | null;
 } | null {
   if (typeof payload.epubCfi !== "string" || payload.epubCfi.trim() === "") {
     return null;
   }
 
-  if (typeof payload.percentage !== "number" || !Number.isFinite(payload.percentage)) {
+  if (
+    payload.percentage !== undefined &&
+    (typeof payload.percentage !== "number" || !Number.isFinite(payload.percentage))
+  ) {
     return null;
   }
 
   return {
     epubCfi: payload.epubCfi,
-    percentage: payload.percentage,
+    percentage: typeof payload.percentage === "number" ? payload.percentage : null,
   };
 }
 
@@ -49,18 +51,17 @@ export async function POST(
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
 
-  const { currentPage, currentPercent } = deriveReadingProgress(
-    parsed.percentage,
-    entry.book.pageCount,
-  );
   const now = new Date();
+  const currentPercent =
+    parsed.percentage === null
+      ? undefined
+      : Math.round(Math.min(1, Math.max(0, parsed.percentage)) * 10000) / 100;
 
   await prisma.shelfEntry.update({
     where: { id: entry.id },
     data: {
-      currentPage,
-      currentPercent,
       epubCfi: parsed.epubCfi,
+      ...(currentPercent === undefined ? {} : { currentPercent }),
       status: entry.status === "WANT_TO_READ" ? "READING" : entry.status,
       startedAt:
         entry.status === "WANT_TO_READ" && !entry.startedAt
@@ -69,5 +70,5 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ ok: true, currentPage, currentPercent });
+  return NextResponse.json({ ok: true });
 }

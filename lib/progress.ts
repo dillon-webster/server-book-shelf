@@ -26,37 +26,6 @@ export function deriveReadingProgress(
   return { currentPage, currentPercent };
 }
 
-export function deriveEpubLocationPercentage({
-  generatedPercentage,
-  spineIndex,
-  spineLength,
-  displayedPage,
-  displayedTotal,
-}: {
-  generatedPercentage: number | null | undefined;
-  spineIndex: number;
-  spineLength: number;
-  displayedPage: number;
-  displayedTotal: number;
-}): number {
-  if (typeof generatedPercentage === "number" && generatedPercentage > 0) {
-    return Math.min(1, generatedPercentage);
-  }
-
-  if (spineLength < 1 || spineIndex < 0) {
-    return 0;
-  }
-
-  const safeSpineIndex = Math.min(spineIndex, spineLength - 1);
-  const sectionSize = 1 / spineLength;
-  const pageOffset =
-    displayedTotal > 1
-      ? (Math.max(1, displayedPage) - 1) / displayedTotal
-      : 0;
-
-  return Math.min(1, (safeSpineIndex + pageOffset) * sectionSize);
-}
-
 export function deriveStatusDates({
   nextStatus,
   previousStartedAt,

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   clampCurrentPage,
-  deriveEpubLocationPercentage,
   deriveReadingProgress,
   deriveStatusDates,
 } from "./progress";
@@ -69,43 +68,4 @@ test("supports reader progress without a page count", () => {
     currentPercent: 50,
     currentPage: 0,
   });
-});
-
-test("uses generated epub percentage when it is meaningful", () => {
-  assert.equal(
-    deriveEpubLocationPercentage({
-      generatedPercentage: 0.42,
-      spineIndex: 1,
-      spineLength: 10,
-      displayedPage: 1,
-      displayedTotal: 5,
-    }),
-    0.42,
-  );
-});
-
-test("estimates epub percentage from spine position when generated percentage is zero", () => {
-  assert.equal(
-    deriveEpubLocationPercentage({
-      generatedPercentage: 0,
-      spineIndex: 1,
-      spineLength: 4,
-      displayedPage: 3,
-      displayedTotal: 10,
-    }),
-    0.3,
-  );
-});
-
-test("keeps epub percentage at zero for the start of the first spine item", () => {
-  assert.equal(
-    deriveEpubLocationPercentage({
-      generatedPercentage: 0,
-      spineIndex: 0,
-      spineLength: 4,
-      displayedPage: 1,
-      displayedTotal: 10,
-    }),
-    0,
-  );
 });

@@ -51,10 +51,10 @@ export default async function BookPage({
       ? Math.min(100, Math.round((entry.currentPage / entry.book.pageCount) * 100))
       : null);
 
-  const progressText = entry.book.pageCount
-    ? `${entry.currentPage}/${entry.book.pageCount} pages`
-    : entry.currentPercent !== null
+  const progressText = entry.currentPercent !== null
       ? `${entry.currentPercent}%`
+      : entry.book.pageCount
+        ? `${entry.currentPage}/${entry.book.pageCount} pages`
       : `${entry.currentPage} pages`;
 
   return (
